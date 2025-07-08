@@ -3,10 +3,27 @@ const socket = io('ws://localhost:3500')
 const msgInput = document.querySelector("#message")
 const nameInput = document.querySelector("#name")
 const chatRoom = document.querySelector("#room")
+const aiCheckbox = document.querySelector("#ai")
+const numMsgInput = document.querySelector("#numMsg")
 const activity = document.querySelector(".activity")
 const usersList = document.querySelector(".user-list")
 const roomList = document.querySelector(".room-list")
 const chatDisplay = document.querySelector(".chat-display")
+const msgForm = document.querySelector('.form-message')
+const msgFormBtn = msgForm.querySelector('button[type="submit"]')
+
+// Disable inputs and button on load
+msgInput.disabled = true
+aiCheckbox.disabled = true
+numMsgInput.disabled = true
+msgFormBtn.disabled = true
+
+function enableMessageInputs() {
+    msgInput.disabled = false
+    aiCheckbox.disabled = false
+    numMsgInput.disabled = false
+    msgFormBtn.disabled = false
+}
 
 function sendMessage(e) {
     e.preventDefault()
@@ -27,6 +44,7 @@ function enterRoom(e){
             name:nameInput.value,
             room:chatRoom.value
         })
+        enableMessageInputs()
     }
 }
 
@@ -38,6 +56,36 @@ document.querySelector(".form-join")
     
 msgInput.addEventListener("keypress", ()=>{
     socket.emit("activity",nameInput.value)
+})
+
+aiCheckbox.addEventListener("change", (e)=>{
+    e.preventDefault()
+    if (aiCheckbox.checked) {
+        socket.emit("aiEnable", { room:chatRoom.value, enabled: true })
+    } else {
+        socket.emit("aiEnable", { room:chatRoom.value, enabled: false })
+    }
+})
+numMsgInput.addEventListener("keydown", (e) => {
+    // Prevent form submission when Enter is pressed in the numMsgInput
+    if (e.key === "Enter") {
+        e.preventDefault()
+        const num = parseInt(numMsgInput.value, 10)
+        if (isNaN(num) || num < 1 || num > 10) {
+            numMsgInput.value = 1 // Reset to default if invalid
+        } else {
+            socket.emit("numMsgChange", { room: chatRoom.value, num: num })
+        }
+    }
+})
+
+numMsgInput.addEventListener("change", (e) => {
+    const num = parseInt(numMsgInput.value, 10)
+    if (isNaN(num) || num < 1 || num > 10) {
+        numMsgInput.value = 1 // Reset to default if invalid
+    } else {
+        socket.emit("numMsgChange", { room: chatRoom.value, num: num })
+    }
 })
 
 
@@ -84,6 +132,18 @@ socket.on("userList", ({users})=>{
 
 socket.on("roomList", ({rooms})=>{
     showRooms(rooms)
+})
+
+socket.on("aiChange", (aiUsageState)=>{
+    console.log("AI enabled:", aiUsageState.enabled)
+    if (!isNaN(aiUsageState.enabled) && aiUsageState.enabled) {
+        aiCheckbox.checked = true
+    } else if (!isNaN(aiUsageState.enabled) && !aiUsageState.enabled) {
+        aiCheckbox.checked = false
+    }
+    if (aiUsageState.lastN) {
+        numMsgInput.value = aiUsageState.lastN
+    }
 })
 
 function showUsers(users){

@@ -29,6 +29,28 @@ const MessagesState = {
     }
 }
 
+const aiRoomState = {
+    rooms:{},
+    setAIEnabled:function(room, enabled){
+        if (!this.rooms[room]) {
+            this.rooms[room] = { enabled: false, lastN: 1 }
+        }
+        this.rooms[room].enabled = enabled
+    },
+    isAIEnabled:function(room){
+        return this.rooms[room]?.enabled || false
+    },
+    setLastNMessages:function(room, num){
+        if (!this.rooms[room]) {
+            this.rooms[room] = { enabled: false, lastN: 1 }
+        }
+        this.rooms[room].lastN = num
+    },
+    getLastNMessages:function(room){
+        return this.rooms[room]?.lastN || 1
+    }
+}
+
 const app = express()
 
 app.use(express.static(path.join(__dirname, "public")))
@@ -83,9 +105,37 @@ io.on("connection",socket=>{
         if (room){
             io.to(room).emit("message",buildMsg(name,text))
             MessagesState.addMessage(room, text)
-            // send messages to ai
-            callAI(room)
+            if(text.trim() === "/clear") {
+                io.to(room).emit("message", buildMsg(ADMIN, "Chat cleared"))
+                MessagesState.rooms[room] = []
+                return
+            }
+            if (aiRoomState.isAIEnabled(room)) {
+                callAI(room)
+            }
         }
+    })
+
+    socket.on("aiEnable", ({room, enabled})=>{
+        if (enabled) {
+            io.to(room).emit("aiChange", {enabled: true})
+            io.to(room).emit("message", buildMsg(ADMIN, "AI is now enabled for this room"))
+            aiRoomState.setAIEnabled(room, true)
+        }
+        else {
+            io.to(room).emit("aiChange", {enabled: false})
+            io.to(room).emit("message", buildMsg(ADMIN, "AI is now disabled for this room"))
+            aiRoomState.setAIEnabled(room, false)
+        }
+    })
+    
+    socket.on("numMsgChange", ({room, num})=>{
+        if (num < 1 || num > 10) {
+            console.error("Invalid number of messages:", num)
+            return
+        }
+        io.to(room).emit("aiChange", { lastN: num })    
+        aiRoomState.setLastNMessages(room, num)
     })
 
     socket.on("disconnect", ()=>{
@@ -182,7 +232,10 @@ function fetchAIResponse(messages){
     
 }
 function callAI(room){
-    const messages = getAllMessagesInRoom(room)
+    let messages = getAllMessagesInRoom(room)
+    const lastN = aiRoomState.getLastNMessages(room)
+    console.log(`Calling AI with last ${lastN} messages in room ${room}`)
+    messages = messages.slice((-lastN - (messages.length > 1 ? 1 : 0))) // Exclude the last message if it is from the AI
     fetchAIResponse(messages).then(response => {
         if (response) {
             const aiMessage = buildMsg(AI, response)
