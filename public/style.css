@@ -39,6 +39,7 @@ main {
     display: flex;
     flex-direction: column;
     gap: 1.5rem;
+    max-height: 95vh; /* prevent overflow */
 }
 
 form {
@@ -150,7 +151,7 @@ ul.chat-display li {
 }
 
 .post__header--reply .post__header--name {
-    color: var(--muted);
+    color: var(--muted2);
     font-weight: 600;
 }
 
@@ -197,16 +198,50 @@ ul.chat-display li {
     }
     ul.chat-display {
         padding: 0.5rem 0.2rem;
+        min-height: 250px;
+        font-size: 0.98rem;
     }
     .post {
         max-width: 98%;
         padding: 0.3rem 0.4rem;
+        font-size: 0.98rem;
+    }
+    input[type="text"], button, input[type="number"] {
+        font-size: 1rem;
+        padding: 0.4rem 0.7rem;
+    }
+    .form-join, .form-message, .form-ai {
+        gap: 0.3rem;
+        align-items: stretch;
+    }
+    .form-ai {
+        font-size: 0.98rem;
+    }
+    .user-list, .room-list, .activity {
+        font-size: 0.92rem;
+    }
+    label[for="ai"], .form-ai p {
+        font-size: 0.95rem;
     }
 }
 
+/* Optionally, further tweaks for very small screens */
+@media (max-width: 350px) {
+    main {
+        padding: 0.5rem 0.1rem;
+    }
+    ul.chat-display {
+        min-height: 120px;
+    }
+    input[type="text"], button, input[type="number"] {
+        font-size: 0.92rem;
+        padding: 0.3rem 0.4rem;
+    }
+}
 
 .form-ai {
     display: flex;
     align-items: center;
     justify-content: flex-start;
+    flex-direction: row;
 }

@@ -60,15 +60,19 @@ const expressServer = app.listen(PORT, ()=>{
 })
 
 const io = new Server(expressServer ,{
-    cors:{
-        origin:process.env.NODE_ENV === "production" ? false : ["http://localhost:5500","http://127.0.0.1:5500"]
-    }
+    cors:["*"]
+    // {
+        // origin:process.env.NODE_ENV === "production" ? false : ["http://localhost:5500","http://127.0.0.1:5500"]
+    // }
 })
 
 io.on("connection",socket=>{
     console.log(`User ${socket.id} connected`)
     // to only to connected user
     socket.emit("message", buildMsg(ADMIN,"Welcome to ChatRoomAI"))
+    io.emit("roomList",{
+        rooms: getAllActiveRooms()
+    })
 
     socket.on("enterRoom", ({name,room})=>{
         const prevRoom = getUser(socket.id)?.room
@@ -100,10 +104,10 @@ io.on("connection",socket=>{
     })
 
     // listen for messages
-    socket.on("message", ({name, text}) => {
+    socket.on("message", async ({name, text}) => {
         const room = getUser(socket.id).room
         if (room){
-            io.to(room).emit("message",buildMsg(name,text))
+            io.to(room).emit("message", buildMsg(name,text))
             MessagesState.addMessage(room, text)
             if(text.trim() === "/clear") {
                 io.to(room).emit("message", buildMsg(ADMIN, "Chat cleared"))
@@ -111,7 +115,26 @@ io.on("connection",socket=>{
                 return
             }
             if (aiRoomState.isAIEnabled(room)) {
-                callAI(room)
+                const aiResponse = await callAI(room)
+                if (aiResponse) {
+                    io.to(room).emit("message", aiResponse)
+                    if (aiResponse.name === AI) {
+                        // Add AI response to messages state
+                        MessagesState.addMessage(room, aiResponse.text, "assistant")
+                    }
+                    MessagesState.addMessage(room, aiResponse.text, "assistant")
+                } else {
+                    console.error("No AI response received")
+                }
+            }
+            if(text.substring(0, 4) === "/ai ") {
+                const aiCommand = text.substring(4).trim()
+                console.log(`AI command received: ${aiCommand}`)
+                const aiResponse = await fetchAIResponse([{role: "user", message: aiCommand}])
+                if (aiResponse) {
+                    const aiMessage = buildMsg(AI, aiResponse)
+                    io.to(room).emit("message", aiMessage)
+                }
             }
         }
     })
@@ -183,8 +206,8 @@ function activateUser(id, name, room){
 }
 
 function userLeaves(id){
-    UsersState.users.filter(user => user.id !== id)
-    
+    // Remove user from UsersState
+    UsersState.setUsers(UsersState.users.filter(user => user.id !== id))
 }
 
 function getUser(id) {
@@ -231,21 +254,23 @@ function fetchAIResponse(messages){
     })
     
 }
-function callAI(room){
+async function callAI(room){
     let messages = getAllMessagesInRoom(room)
     const lastN = aiRoomState.getLastNMessages(room)
     console.log(`Calling AI with last ${lastN} messages in room ${room}`)
-    messages = messages.slice((-lastN - (messages.length > 1 ? 1 : 0))) // Exclude the last message if it is from the AI
-    fetchAIResponse(messages).then(response => {
+    // Only send the last N messages, and avoid sending the last AI message again
+    messages = messages.slice((-lastN - (messages.length > 1 ? 1 : 0)))
+    try {
+        const response = await fetchAIResponse(messages)
         if (response) {
             const aiMessage = buildMsg(AI, response)
-            io.to(room).emit("message", aiMessage)
-            MessagesState.addMessage(room, aiMessage.text, "assistant")
+            return aiMessage
         } else {
             console.error("No response from AI")
+            return buildMsg(ADMIN, "No response from AI")
         }
-    }).catch(err => {
+    } catch (err) {
         console.error("Error calling AI:", err)
-        io.to(room).emit("message", buildMsg(ADMIN, "Error fetching AI response"))
-    })
+        return buildMsg(ADMIN, "Error fetching AI response")
+    }
 }

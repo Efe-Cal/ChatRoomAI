@@ -33,6 +33,7 @@ function sendMessage(e) {
             text:msgInput.value
         })
         msgInput.value = ""
+        numMsgInput.value = parseInt(numMsgInput.value) + (aiCheckbox.checked ? 2 : 0)
     }
     msgInput.focus()
 }
@@ -113,6 +114,13 @@ socket.on("message", (data) => {
     
     document.querySelector('.chat-display').appendChild(li)
     chatDisplay.scrollTop = chatDisplay.scrollHeight
+    // play notification sound
+    if (name !== nameInput.value) {
+        const audio = new Audio('/notification-sound.mp3')
+        audio.play().catch(err => {
+            console.error("Error playing notification sound:", err)
+        })
+    }
 })
 
 let activityTimer
