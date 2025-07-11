@@ -122,7 +122,6 @@ io.on("connection",socket=>{
                         // Add AI response to messages state
                         MessagesState.addMessage(room, aiResponse.text, "assistant")
                     }
-                    MessagesState.addMessage(room, aiResponse.text, "assistant")
                 } else {
                     console.error("No AI response received")
                 }

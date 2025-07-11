@@ -1,4 +1,4 @@
-const socket = io('ws://localhost:3500')
+const socket = io()
 
 const msgInput = document.querySelector("#message")
 const nameInput = document.querySelector("#name")
@@ -25,15 +25,26 @@ function enableMessageInputs() {
     msgFormBtn.disabled = false
 }
 
+let lastMessageTime = 0
+let rateLimitWarningTimeout
+
+
 function sendMessage(e) {
     e.preventDefault()
+    const now = Date.now()
+    if (now - lastMessageTime < 1000) {
+        alert("Please wait before sending another message.")
+        return
+    }
     if (msgInput.value && chatRoom.value && nameInput.value ) {
         socket.emit("message", {
             name:nameInput.value,
             text:msgInput.value
         })
         msgInput.value = ""
-        numMsgInput.value = parseInt(numMsgInput.value) + (aiCheckbox.checked ? 2 : 0)
+        numMsgInput.value = parseInt(numMsgInput.value) + (aiCheckbox.checked ? 2 : 1)
+        sendNumMsg()
+        lastMessageTime = now
     }
     msgInput.focus()
 }
@@ -64,6 +75,7 @@ aiCheckbox.addEventListener("change", (e)=>{
     if (aiCheckbox.checked) {
         socket.emit("aiEnable", { room:chatRoom.value, enabled: true })
     } else {
+        numMsgInput.value = 0
         socket.emit("aiEnable", { room:chatRoom.value, enabled: false })
     }
 })
@@ -71,22 +83,21 @@ numMsgInput.addEventListener("keydown", (e) => {
     // Prevent form submission when Enter is pressed in the numMsgInput
     if (e.key === "Enter") {
         e.preventDefault()
-        const num = parseInt(numMsgInput.value, 10)
-        if (isNaN(num) || num < 1 || num > 10) {
-            numMsgInput.value = 1 // Reset to default if invalid
-        } else {
-            socket.emit("numMsgChange", { room: chatRoom.value, num: num })
-        }
+        sendNumMsg()
     }
 })
 
-numMsgInput.addEventListener("change", (e) => {
+const sendNumMsg = () => {    
     const num = parseInt(numMsgInput.value, 10)
     if (isNaN(num) || num < 1 || num > 10) {
         numMsgInput.value = 1 // Reset to default if invalid
     } else {
         socket.emit("numMsgChange", { room: chatRoom.value, num: num })
     }
+}
+
+numMsgInput.addEventListener("change", (e) => {
+    sendNumMsg()
 })
 
 
