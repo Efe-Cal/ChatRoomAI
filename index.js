@@ -2,6 +2,7 @@ import express from "express"
 import { Server } from "socket.io"
 import path from "path"
 import { fileURLToPath } from "url"
+import favicon from "serve-favicon"
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -54,6 +55,8 @@ const aiRoomState = {
 const app = express()
 
 app.use(express.static(path.join(__dirname, "public")))
+
+app.use(favicon(path.join(__dirname, 'public', 'favicon.ico')))
 
 const expressServer = app.listen(PORT, ()=>{
     console.log(`Listening on port ${PORT}`)
